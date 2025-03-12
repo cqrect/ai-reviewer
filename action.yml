@@ -1,0 +1,32 @@
+name: 'AI Reviewer'
+description: 'An AI-powered code reviewer for Github pull requests'
+author: 'cqrect'
+branding:
+  icon: 'check-circle'
+  color: 'blue'
+
+inputs:
+  pr_number:
+    description: 'Pull Request number'
+    require: true
+  github_token:
+    description: 'Github Token to access the repository'
+    required: true
+  openai_api_key:
+    description: 'OpenAI API Key for AI-powered review'
+    required: true
+  openai_base_url:
+    description: 'Base URL for OpenAI API (optional, for custom models)'
+    required: false
+  model_name:
+    description: 'AI model name to use for code review'
+    required: false
+    default: 'gpt-4'
+
+permissions:
+  contents: read
+  pull-requests: write
+
+runs:
+  using: 'docker'
+  image: 'Dockerfile'

@@ -21,7 +21,11 @@ inputs:
   model_name:
     description: 'AI model name to use for code review'
     required: false
-    default: 'gpt-4'
+    default: 'gpt-3.5-turbo'
+  lang:
+    description: 'AI answer language'
+    required: false
+    default: '中文'
 
 permissions:
   contents: read

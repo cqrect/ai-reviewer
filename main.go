@@ -21,6 +21,7 @@ var (
 	OPENAI_API_KEY  string
 	OPENAI_BASE_URL string
 	MODEL_NAME      string
+	LANG            string
 )
 
 func init() {
@@ -41,6 +42,7 @@ func init() {
 	OPENAI_API_KEY = os.Getenv("INPUT_OPENAI_API_KEY")
 	OPENAI_BASE_URL = os.Getenv("INPUT_OPENAI_BASE_URL")
 	MODEL_NAME = os.Getenv("INPUT_MODEL_NAME")
+	LANG = os.Getenv("LANG")
 }
 
 func main() {
@@ -72,14 +74,17 @@ func main() {
 	}
 
 	// 读取 prompt
-	prompt, err := os.ReadFile("/app/prompt.txt")
+	promptTemp, err := os.ReadFile("/app/prompt.txt")
 	if err != nil {
 		log.Println("read prompt.txt error")
 		log.Fatal(err)
 	}
 
+	// 设置回答语言
+	prompt := strings.ReplaceAll(string(promptTemp), "{{LANG}}", LANG)
+
 	// AI 审查
-	result, err := ai.Chat(ctx, MODEL_NAME, string(prompt), code)
+	result, err := ai.Chat(ctx, MODEL_NAME, prompt, code)
 	if err != nil {
 		log.Println("AI chat error")
 		log.Fatal(err)

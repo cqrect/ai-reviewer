@@ -2,6 +2,7 @@ package ai
 
 import (
 	"context"
+	"strings"
 
 	"github.com/openai/openai-go"
 	"github.com/openai/openai-go/option"
@@ -33,6 +34,9 @@ func Init(token, baseUrl string) {
 	if baseUrl == "" {
 		client = openai.NewClient(option.WithAPIKey(token))
 	} else {
+		if !strings.HasSuffix(baseUrl, "/") {
+			baseUrl = baseUrl + "/"
+		}
 		client = openai.NewClient(option.WithBaseURL(baseUrl), option.WithAPIKey(token))
 	}
 }

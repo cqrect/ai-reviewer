@@ -121,7 +121,7 @@ func main() {
 
 	// 审核未通过
 	comment := "❌ 您的 PR 审核**未通过**，请参考错误信息修改后重新提交哦～\n\n"
-	prombleTemplate := "---\n**文件名**: `%s`\n%s\n⚠️ **问题描述**\n%s\n\n💡 **修改建议**\n%s\n\n"
+	prombleTemplate := "---\n**文件名**: `%s`\n\n%s\n\n⚠️ **问题描述**\n%s\n\n💡 **修改建议**\n%s\n\n"
 	for _, promble := range answer.Problems {
 		comment += fmt.Sprintf(prombleTemplate, promble.File, promble.Code, promble.Description, promble.Suggestion)
 	}

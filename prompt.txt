@@ -31,13 +31,3 @@
   "title": "添加 Add 示例",
   "description": "1. 调整 Add 函数逻辑。\n2. 为 Add 函数提供调用示例。"
 }
-
-错误示例：
-不要带json标签！！！
-不要带json标签！！！
-不要带json标签！！！
-```json
-{
-  "pass": true
-}
-```

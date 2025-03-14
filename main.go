@@ -42,7 +42,7 @@ func init() {
 	OPENAI_API_KEY = os.Getenv("INPUT_OPENAI_API_KEY")
 	OPENAI_BASE_URL = os.Getenv("INPUT_OPENAI_BASE_URL")
 	MODEL_NAME = os.Getenv("INPUT_MODEL_NAME")
-	LANG = os.Getenv("LANG")
+	LANG = os.Getenv("INPUT_LANG")
 }
 
 func main() {
@@ -89,6 +89,9 @@ func main() {
 		log.Println("AI chat error")
 		log.Fatal(err)
 	}
+
+	// 去除 json 标签
+	result = strings.TrimSuffix(strings.TrimPrefix(result, "\n\n```json"), "```")
 
 	// 解析回答
 	var answer ai.Answer

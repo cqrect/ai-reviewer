@@ -126,4 +126,7 @@ func main() {
 		log.Println("set review status to false error")
 		log.Fatal(err)
 	}
+
+	// 审查不通过 action 报错
+	log.Fatal("Critical Issues Found")
 }

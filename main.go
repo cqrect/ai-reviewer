@@ -91,7 +91,9 @@ func main() {
 	}
 
 	// 去除 json 标签
-	result = strings.TrimSuffix(strings.TrimPrefix(result, "\n\n```json"), "```")
+	result = strings.TrimSuffix(strings.TrimPrefix(result, "\n\n```json"), "```\n\n")
+	result = strings.TrimSuffix(strings.TrimPrefix(result, "\n```json"), "```\n")
+	result = strings.TrimSuffix(strings.TrimPrefix(result, "```json"), "```")
 
 	// 解析回答
 	var answer ai.Answer

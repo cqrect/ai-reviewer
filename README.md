@@ -33,14 +33,13 @@
 
 2. 在仓库设置中添加`Secrets`:
    - `OPENAI_API_KEY`: 你的 API 密钥
-   - `GITHUB_TOKEN`: GitHub 访问令牌
 
 **配置选项 ⚙️**
 输入参数
 |参数名称|必需|默认值|描述
 ---|---|---|---
 `pr_number`|是|-|要审查的 Pull Request 编号，通过 `github.event.pull_request.number` 获取
-`github_token`|是|-|GitHub 访问令牌，用以评论和审查
+`github_token`|是|-|GitHub 访问令牌，用以评论和审查，可以使用默认 `secrets.GITHUB_TOKEN` 配置，也可以自己生成
 `openai_api_key`|是|-|AI API_KEY
 `openai_base_url`|否|-|自定义 OpenAI 兼容 API 地址
 `model_name`|否|gpt-3.5-turbo|使用的 AI 模型名称
@@ -62,7 +61,7 @@ A: 请使用`pull_request_target`而不是`pull_request`。
 
 **Q: 我可以审核自己的 PR 吗？**
 
-A: 不可以审核`GITHUB_TOKEN`提供者的 PR，即**不能自己审核自己**。
+A: 不可以审核`GITHUB_TOKEN`提供者的 PR，即**不能自己审核自己**，建议直接使用`secrets.GITHUB_TOKEN`。
 
 **Q: 支持哪些模型？支持本地模型吗？**
 

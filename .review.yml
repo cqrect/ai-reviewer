@@ -1,7 +1,0 @@
-prompt: |
-  你是一个资深的开发者
-
-exclude:
-  - '**/testdata/**'
-  - '**/*_test.go'
-  - '**/vendor/**'

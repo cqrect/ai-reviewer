@@ -36,7 +36,7 @@ func (r *ReviewConf) GetExclude() []string {
 		return []string{}
 	}
 
-	return r.GetExclude()
+	return r.Exclude
 }
 
 func (r *ReviewConf) MatchAnyPattern(filename string) bool {

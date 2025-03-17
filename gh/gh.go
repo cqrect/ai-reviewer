@@ -3,6 +3,7 @@ package gh
 import (
 	"context"
 	"fmt"
+	"log"
 
 	"github.com/google/go-github/v69/github"
 )
@@ -109,4 +110,23 @@ func (c *GHClient) UpdatePRDetails(ctx context.Context, title, body string) erro
 
 	_, _, err := c.client.PullRequests.Edit(ctx, c.owner, c.repo, c.prNumber, prUpdate)
 	return err
+}
+
+func (c *GHClient) ClearComments(ctx context.Context, actor string) error {
+	comments, _, err := c.client.PullRequests.ListComments(ctx, c.owner, c.repo, c.prNumber, nil)
+	if err != nil {
+		return err
+	}
+
+	for _, comment := range comments {
+		if comment.User.GetLogin() == actor {
+			_, delErr := c.client.PullRequests.DeleteComment(ctx, c.owner, c.repo, comment.GetID())
+			if delErr != nil {
+				log.Printf("failed to delete comment ID %d:%s", comment.GetID(), delErr)
+				continue
+			}
+		}
+	}
+
+	return nil
 }

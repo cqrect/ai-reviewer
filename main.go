@@ -77,11 +77,17 @@ func main() {
 		if err != nil {
 			log.Fatalf("load config file error: %s", err.Error())
 		}
+		log.Printf("using custom config file: %s", conf.ConfName)
 	}
 
 	// addtional prompt
 	if config.GetPrompt() != "" {
 		prompt += fmt.Sprintf("\nHere are some additional rules you need to follow:\n%s", config.GetPrompt())
+	}
+
+	// clear comments
+	if err := client.ClearComments(ctx, "github-actions[bot]"); err != nil {
+		log.Fatalf("clear comments error: %s", err.Error())
 	}
 
 	// get PR change files

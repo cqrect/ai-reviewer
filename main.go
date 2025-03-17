@@ -177,9 +177,10 @@ func main() {
 	}
 
 	// summary
+	log.Println("Generate Summary")
 	for _, each := range flags {
 		if !each {
-			if err := client.UpdatePRReviewStatus(ctx, pr, false, "⚠️ Problem Found"); err != nil {
+			if err := client.UpdatePRReviewStatus(ctx, pr, false, "Problem Found"); err != nil {
 				log.Fatalf("update review status error: %s", err.Error())
 			}
 			return

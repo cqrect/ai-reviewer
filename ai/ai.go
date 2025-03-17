@@ -2,6 +2,7 @@ package ai
 
 import (
 	"context"
+	"log"
 	"strings"
 
 	"github.com/openai/openai-go"
@@ -11,23 +12,20 @@ import (
 var client *openai.Client
 
 type Answer struct {
-	// 是否通过
-	Pass bool `json:"pass"`
-	// PR 标题
-	Title string `json:"title"`
-	// PR 描述
-	Description string `json:"description"`
-	// 问题
+	Pass     bool   `json:"pass"`
+	Desc     string `json:"desc"`
+	Lang     string `json:"lang"`
 	Problems []struct {
-		// 文件名
-		File string `json:"file"`
-		// 错误代码
-		Code string `json:"code"`
-		// 错误描述
-		Description string `json:"description"`
-		// 修改建议
+		File       string `json:"file"`
+		Reason     string `json:"reason"`
+		Code       string `json:"code"`
 		Suggestion string `json:"suggestion"`
 	} `json:"problems"`
+}
+
+type Summary struct {
+	Title       string `json:"title"`
+	Description string `json:"description"`
 }
 
 func Init(token, baseUrl string) {
@@ -37,22 +35,39 @@ func Init(token, baseUrl string) {
 		if !strings.HasSuffix(baseUrl, "/") {
 			baseUrl = baseUrl + "/"
 		}
-		client = openai.NewClient(option.WithBaseURL(baseUrl), option.WithAPIKey(token))
+		client = openai.NewClient(option.WithAPIKey(token), option.WithBaseURL(baseUrl))
 	}
 }
 
-// Chat AI问答
-func Chat(ctx context.Context, model, prompt, message string) (string, error) {
-	completion, err := client.Chat.Completions.New(ctx, openai.ChatCompletionNewParams{
-		Messages: openai.F([]openai.ChatCompletionMessageParamUnion{
-			openai.SystemMessage(prompt),
-			openai.UserMessage(message),
-		}),
-		Model: openai.F(model),
-	})
+func Chat(ctx context.Context, model, prompt, v string) (string, error) {
+	if client == nil {
+		log.Fatal("ai client is nil, maybe you should init it first")
+	}
+
+	completion, err := client.Chat.Completions.New(
+		ctx,
+		openai.ChatCompletionNewParams{
+			Messages: openai.F([]openai.ChatCompletionMessageParamUnion{
+				openai.SystemMessage(prompt),
+				openai.UserMessage(v),
+			}),
+			Model: openai.F(model),
+		},
+	)
 	if err != nil {
 		return "", err
 	}
 
-	return completion.Choices[0].Message.Content, nil
+	log.Printf("Input tokens: %d", completion.Usage.PromptTokens)
+	log.Printf("Reasoning tokens: %d", completion.Usage.CompletionTokensDetails.ReasoningTokens)
+	log.Printf("Output tokens: %d", completion.Usage.CompletionTokens)
+
+	// remove json label
+	result := completion.Choices[0].Message.Content
+	result = strings.Trim(result, "\n")
+	result = strings.TrimSpace(result)
+	result = strings.TrimPrefix(result, "```json")
+	result = strings.TrimSuffix(result, "```")
+
+	return result, nil
 }

@@ -90,6 +90,11 @@ func main() {
 		log.Fatalf("clear comments error: %s", err.Error())
 	}
 
+	// dismiss reviews
+	if err := client.DismissReviews(ctx, "github-actions[bot]"); err != nil {
+		log.Fatalf("dismiss reviews error: %s", err.Error())
+	}
+
 	// get PR change files
 	files, err := client.ListPRFiles(ctx)
 	if err != nil {
@@ -131,6 +136,7 @@ func main() {
 			continue
 		}
 
+		log.Printf("Review file: %s", file.GetFilename())
 		code := fmt.Sprintf("Filename: %s\n\nChanges: %s", file.GetFilename(), file.GetPatch())
 		result, err := ai.Chat(ctx, MODEL_NAME, prompt, code)
 		if err != nil {

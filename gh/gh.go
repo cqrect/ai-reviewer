@@ -130,3 +130,23 @@ func (c *GHClient) ClearComments(ctx context.Context, actor string) error {
 
 	return nil
 }
+
+func (c *GHClient) DismissReviews(ctx context.Context, actor string) error {
+	reviews, _, err := c.client.PullRequests.ListReviews(ctx, c.owner, c.repo, c.prNumber, nil)
+	if err != nil {
+		return err
+	}
+
+	for _, review := range reviews {
+		if review.User.GetLogin() == actor && review.GetState() == "CHANGES_REQUESTED" {
+			dismissMsg := "Auto-dismiss previous review"
+			_, _, err := c.client.PullRequests.DismissReview(ctx, c.owner, c.repo, c.prNumber, review.GetID(), &github.PullRequestReviewDismissalRequest{
+				Message: &dismissMsg,
+			})
+			if err != nil {
+				return err
+			}
+		}
+	}
+	return nil
+}

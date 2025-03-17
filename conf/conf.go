@@ -11,6 +11,7 @@ const ConfName = ".review.yml"
 
 type ReviewConf struct {
 	Prompt  string   `yaml:"prompt"`
+	Summary string   `yaml:"summary"`
 	Exclude []string `yaml:"exclude"`
 }
 
@@ -29,6 +30,14 @@ func (r *ReviewConf) GetPrompt() string {
 	}
 
 	return r.Prompt
+}
+
+func (r *ReviewConf) GetSummary() string {
+	if r == nil {
+		return ""
+	}
+
+	return r.Summary
 }
 
 func (r *ReviewConf) GetExclude() []string {

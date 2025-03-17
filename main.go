@@ -187,6 +187,11 @@ func main() {
 		}
 	}
 
+	// addtional summary
+	if config.GetSummary() != "" {
+		summary += fmt.Sprintf("\nHere are some additional rules you need to follow:\n%s", config.GetSummary())
+	}
+
 	// all pass
 	result, err := ai.Chat(ctx, MODEL_NAME, summary, fmt.Sprintf("Origin PR Title: %s\n\nCommits:\n %s", pr.GetTitle(), strings.Join(changes, "\n\n")))
 	if err != nil {

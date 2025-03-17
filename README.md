@@ -1,6 +1,6 @@
 # AI Code Reviewer 🤖
 
-[![GitHub Action](https://img.shields.io/badge/GitHub_Action-v1.0-blue.svg)](https://github.com/marketplace/actions/ai-code-reviewer)
+[![GitHub Action](https://img.shields.io/badge/GitHub_Action-v2.0-blue.svg)](https://github.com/marketplace/actions/ai-code-reviewer)
 [![Docker Image](https://img.shields.io/docker/pulls/cqrect/ai-reviewer)](https://hub.docker.com/r/cqrect/ai-reviewer)
 
 基于 AI 的智能代码审查 GitHub Action，自动为 Pull Request 提供专业代码审查建议。

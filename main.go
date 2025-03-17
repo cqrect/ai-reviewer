@@ -40,9 +40,12 @@ func init() {
 	if err != nil {
 		log.Fatalf("invalid PR number: %v", err)
 	}
+	repository := os.Getenv("GITHUB_REPOSITORY")
+	parts := strings.Split(repository, "/")
+	GITHUB_REPOSITORY_OWNER = parts[0]
+	GITHUB_REPOSITORY = parts[1]
+
 	GITHUB_TOKEN = os.Getenv("INPUT_GITHUB_TOKEN")
-	GITHUB_REPOSITORY = os.Getenv("GITHUB_REPOSITORY")
-	GITHUB_REPOSITORY_OWNER = os.Getenv("GITHUB_REPOSITORY_OWNER")
 	OPENAI_API_KEY = os.Getenv("INPUT_OPENAI_API_KEY")
 	OPENAI_BASE_URL = os.Getenv("INPUT_OPENAI_BASE_URL")
 	MODEL_NAME = os.Getenv("INPUT_MODEL_NAME")

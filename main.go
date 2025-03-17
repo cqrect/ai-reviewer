@@ -95,6 +95,11 @@ func main() {
 
 	// get PR changes
 	for _, file := range files {
+		// pass config file
+		if file.GetFilename() == conf.ConfName {
+			continue
+		}
+
 		// pass exclude file
 		if config.MatchAnyPattern(file.GetFilename()) {
 			continue

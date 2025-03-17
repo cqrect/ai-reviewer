@@ -7,93 +7,106 @@ import (
 	"github.com/google/go-github/v69/github"
 )
 
+// GHClient encapsulates GitHub API client operations for Pull Request management
 type GHClient struct {
+	// Authenicated GitHub API client instance
 	client *github.Client
+
+	// Repository owner (user or organization)
+	owner string
+
+	// Target repository name
+	repo string
+
+	// Pull Request number to operate on
+	prNumber int
 }
 
-func NewGHClient(token string) *GHClient {
+// NewGHClient constructs and initializes a GitHub client instance
+func NewGHClient(token, owner, repo string, prNumber int) *GHClient {
 	return &GHClient{
-		client: github.NewClient(nil).WithAuthToken(token),
+		client:   github.NewClient(nil).WithAuthToken(token),
+		owner:    owner,
+		repo:     repo,
+		prNumber: prNumber,
 	}
 }
 
-// GetPRDetails 获取 PR 详情
-func (g *GHClient) GetPRDetails(ctx context.Context, repoOwner, repoName string, prNumber int) (*github.PullRequest, error) {
-	pr, _, err := g.client.PullRequests.Get(ctx, repoOwner, repoName, prNumber)
-	if err != nil {
-		return nil, err
-	}
-
-	return pr, nil
+// GetPRDetails retrieves detailed information about a specific Pull Request
+func (c *GHClient) GetPRDetails(ctx context.Context) (*github.PullRequest, error) {
+	pr, _, err := c.client.PullRequests.Get(
+		ctx,
+		c.owner,
+		c.repo,
+		c.prNumber,
+	)
+	return pr, err
 }
 
-// Comment 给指定 PR 评论
-func (g *GHClient) Comment(ctx context.Context, repoOwner, repoName string, prNumber int, comment string) error {
-	c := &github.IssueComment{
-		Body: &comment,
-	}
+// ListPRFiles lists all modified files in a Pull Request
+func (c *GHClient) ListPRFiles(ctx context.Context) ([]*github.CommitFile, error) {
+	files, _, err := c.client.PullRequests.ListFiles(
+		ctx,
+		c.owner,
+		c.repo,
+		c.prNumber,
+		nil,
+	)
+	return files, err
+}
 
-	_, _, err := g.client.Issues.CreateComment(ctx, repoOwner, repoName, prNumber, c)
+// GetRawContent retrieves raw file content (without diff formatting)
+func (c *GHClient) GetRawContent(ctx context.Context, pr *github.PullRequest, name string) (*github.RepositoryContent, error) {
+	fileContent, _, _, err := c.client.Repositories.GetContents(
+		ctx,
+		c.owner,
+		c.repo,
+		name,
+		&github.RepositoryContentGetOptions{
+			Ref: pr.Head.GetSHA(),
+		},
+	)
+	return fileContent, err
+}
+
+// CreateComments creates multi review comments
+func (c *GHClient) CreateComments(ctx context.Context, pr *github.PullRequest, comments []*github.DraftReviewComment) error {
+	var event string = "COMMENT"
+
+	_, _, err := c.client.PullRequests.CreateReview(ctx, c.owner, c.repo, c.prNumber, &github.PullRequestReviewRequest{
+		CommitID: pr.Head.SHA,
+		Event:    &event,
+		Comments: comments,
+	})
 
 	return err
 }
 
-// AtComment @PR提交者并评论
-func (g *GHClient) AtComment(ctx context.Context, repoOwner, repoName string, prNumber int, comment string) error {
-	pr, err := g.GetPRDetails(ctx, repoOwner, repoName, prNumber)
-	if err != nil {
-		return err
-	}
-
-	author := pr.GetUser().GetLogin()
-	comment = fmt.Sprintf("@%s %s", author, comment)
-
-	return g.Comment(ctx, repoOwner, repoName, prNumber, comment)
-}
-
-// ListChangeFiles 获取修改的文件
-func (g *GHClient) ListChangeFiles(ctx context.Context, repoOwner, repoName string, prNumber int) ([]*github.CommitFile, error) {
-	files, _, err := g.client.PullRequests.ListFiles(ctx, repoOwner, repoName, prNumber, nil)
-	if err != nil {
-		return nil, err
-	}
-
-	return files, nil
-}
-
-// SetReviewStatus 设置审查状态
-func (g *GHClient) SetReviewStatus(ctx context.Context, repoOwner, repoName string, prNumber int, pass bool, comment string) error {
-	pr, err := g.GetPRDetails(ctx, repoOwner, repoName, prNumber)
-	if err != nil {
-		return err
-	}
-
-	author := pr.GetUser().GetLogin()
-	comment = fmt.Sprintf("@%s %s", author, comment)
-
+func (c *GHClient) UpdatePRReviewStatus(ctx context.Context, pr *github.PullRequest, pass bool, comment string) error {
 	var event string
 	if pass {
-		event = "APPROVE"
+		event = "COMMENT"
 	} else {
 		event = "REQUEST_CHANGES"
 	}
 
-	review := &github.PullRequestReviewRequest{
-		Body:  &comment,
-		Event: &event,
-	}
+	author := pr.User.GetLogin()
 
-	_, _, err = g.client.PullRequests.CreateReview(ctx, repoOwner, repoName, prNumber, review)
+	mention := fmt.Sprintf("@%s %s", author, comment)
+
+	_, _, err := c.client.PullRequests.CreateReview(ctx, c.owner, c.repo, c.prNumber, &github.PullRequestReviewRequest{
+		Event: &event,
+		Body:  &mention,
+	})
 	return err
 }
 
-// UpdatePRDetails 修改 PR 详情
-func (g *GHClient) UpdatePRDetails(ctx context.Context, repoOwner, repoName string, prNumber int, title, body string) error {
+func (c *GHClient) UpdatePRDetails(ctx context.Context, title, body string) error {
 	prUpdate := &github.PullRequest{
 		Title: &title,
 		Body:  &body,
 	}
 
-	_, _, err := g.client.PullRequests.Edit(ctx, repoOwner, repoName, prNumber, prUpdate)
+	_, _, err := c.client.PullRequests.Edit(ctx, c.owner, c.repo, c.prNumber, prUpdate)
 	return err
 }

@@ -10,6 +10,5 @@ RUN apk add --no-cache \
     tzdata && \
     update-ca-certificates
 COPY --from=builder /build/review /app/review
-COPY --from=builder /build/prompt.txt /app/prompt.txt
 
 ENTRYPOINT ["/app/review"]

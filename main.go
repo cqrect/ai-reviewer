@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bufio"
 	"context"
 	"encoding/json"
 	"fmt"
@@ -9,129 +10,208 @@ import (
 	"strconv"
 	"strings"
 
+	_ "embed"
+
 	"github.com/cqrect/ai-reviewer/ai"
+	"github.com/cqrect/ai-reviewer/conf"
 	"github.com/cqrect/ai-reviewer/gh"
+	"github.com/google/go-github/v69/github"
 )
 
+//go:embed  prompt.txt
+var prompt string
+
+//go:embed summary.txt
+var summary string
+
 var (
-	REPO_OWNER      string
-	REPO_NAME       string
-	PR_NUMBER       int
-	GITHUB_TOKEN    string
-	OPENAI_API_KEY  string
-	OPENAI_BASE_URL string
-	MODEL_NAME      string
-	LANG            string
+	GITHUB_TOKEN            string
+	GITHUB_REPOSITORY_OWNER string
+	GITHUB_REPOSITORY       string
+	PR_NUMBER               int
+	OPENAI_API_KEY          string
+	OPENAI_BASE_URL         string
+	MODEL_NAME              string
 )
 
 func init() {
 	var err error
-
-	prNumberStr := os.Getenv("INPUT_PR_NUMBER")
-	PR_NUMBER, err = strconv.Atoi(prNumberStr)
+	PR_NUMBER, err = strconv.Atoi(os.Getenv("INPUT_PR_NUMBER"))
 	if err != nil {
-		log.Fatalf("无效的 PR 编号输入: %v", err)
+		log.Fatalf("invalid PR number: %v", err)
 	}
-
-	repoFullName := os.Getenv("GITHUB_REPOSITORY")
-	parts := strings.Split(repoFullName, "/")
-	REPO_OWNER = parts[0]
-	REPO_NAME = parts[1]
-
 	GITHUB_TOKEN = os.Getenv("INPUT_GITHUB_TOKEN")
+	GITHUB_REPOSITORY = os.Getenv("GITHUB_REPOSITORY")
+	GITHUB_REPOSITORY_OWNER = os.Getenv("GITHUB_REPOSITORY_OWNER")
 	OPENAI_API_KEY = os.Getenv("INPUT_OPENAI_API_KEY")
 	OPENAI_BASE_URL = os.Getenv("INPUT_OPENAI_BASE_URL")
 	MODEL_NAME = os.Getenv("INPUT_MODEL_NAME")
-	LANG = os.Getenv("INPUT_LANG")
 }
 
 func main() {
 	ctx := context.Background()
 
+	client := gh.NewGHClient(GITHUB_TOKEN, GITHUB_REPOSITORY_OWNER, GITHUB_REPOSITORY, PR_NUMBER)
 	ai.Init(OPENAI_API_KEY, OPENAI_BASE_URL)
 
-	gClient := gh.NewGHClient(GITHUB_TOKEN)
-
-	// 获取 PR 信息
-	pr, err := gClient.GetPRDetails(ctx, REPO_OWNER, REPO_NAME, PR_NUMBER)
+	// get PR details
+	pr, err := client.GetPRDetails(ctx)
 	if err != nil {
-		log.Println("get PR details error")
-		log.Fatal(err)
+		log.Fatalf("get PR details error: %s", err.Error())
 	}
 
-	// 获取修改文件
-	files, err := gClient.ListChangeFiles(ctx, REPO_OWNER, REPO_NAME, PR_NUMBER)
+	// try to read config file from repostory
+	var config *conf.ReviewConf
+	confFile, err := client.GetRawContent(ctx, pr, conf.ConfName)
 	if err != nil {
-		log.Println("list change files error")
-		log.Fatal(err)
+		log.Println("using default config")
+	} else {
+		data, err := confFile.GetContent()
+		if err != nil {
+			log.Fatalf("read config file %s error: %s", conf.ConfName, err.Error())
+		}
+		config, err = conf.LoadConf(data)
+		if err != nil {
+			log.Fatalf("load config file error: %s", err.Error())
+		}
 	}
 
-	// 拼接代码
-	codeTemplate := "<filename>%s</filename>\n<change>%s</change>\n\n"
-	code := fmt.Sprintf("<title>%s</title>\n", *pr.Title)
+	// addtional prompt
+	if config.GetPrompt() != "" {
+		prompt += fmt.Sprintf("\nHere are some additional rules you need to follow:\n%s", config.GetPrompt())
+	}
+
+	// get PR change files
+	files, err := client.ListPRFiles(ctx)
+	if err != nil {
+		log.Fatalf("list PR files error: %s", err.Error())
+	}
+
+	changes := make([]string, 0)
+	flags := make([]bool, 0)
+
+	// get PR changes
 	for _, file := range files {
-		code += fmt.Sprintf(codeTemplate, *file.Filename, *file.Patch)
-	}
-
-	// 读取 prompt
-	promptTemp, err := os.ReadFile("/app/prompt.txt")
-	if err != nil {
-		log.Println("read prompt.txt error")
-		log.Fatal(err)
-	}
-
-	// 设置回答语言
-	prompt := strings.ReplaceAll(string(promptTemp), "{{LANG}}", LANG)
-
-	// AI 审查
-	result, err := ai.Chat(ctx, MODEL_NAME, prompt, code)
-	if err != nil {
-		log.Println("AI chat error")
-		log.Fatal(err)
-	}
-
-	// 去除 json 标签
-	result = strings.TrimSuffix(strings.TrimPrefix(result, "\n\n```json"), "```\n\n")
-	result = strings.TrimSuffix(strings.TrimPrefix(result, "\n```json"), "```\n")
-	result = strings.TrimSuffix(strings.TrimPrefix(result, "```json"), "```")
-
-	// 解析回答
-	var answer ai.Answer
-	if err := json.Unmarshal([]byte(result), &answer); err != nil {
-		log.Println("parse answer json error")
-		log.Fatal(err)
-	}
-
-	// 审查通过
-	if answer.Pass {
-		// 修改 PR 详情
-		if err := gClient.UpdatePRDetails(ctx, REPO_OWNER, REPO_NAME, PR_NUMBER, answer.Title, answer.Description); err != nil {
-			log.Println("update PR details error")
-			log.Fatal(err)
+		// pass exclude file
+		if config.MatchAnyPattern(file.GetFilename()) {
+			continue
 		}
 
-		// 设置审查状态
-		if err := gClient.SetReviewStatus(ctx, REPO_OWNER, REPO_NAME, PR_NUMBER, true, "LGTM"); err != nil {
-			log.Println("set review status to true error")
-			log.Fatal(err)
+		// pass deleted file
+		if file.GetStatus() == "removed" {
+			continue
 		}
 
-		return
+		// pass file has tag
+		fileContent, err := client.GetRawContent(ctx, pr, file.GetFilename())
+		if err != nil {
+			log.Fatalf("%s get raw content error: %s", file.GetFilename(), err.Error())
+		}
+
+		content, err := fileContent.GetContent()
+		if err != nil {
+			log.Fatalf("get file content error: %s", err.Error())
+		}
+
+		if hasReviewPassHeader(content) {
+			continue
+		}
+
+		code := fmt.Sprintf("Filename: %s\n\nChanges: %s", file.GetFilename(), file.GetPatch())
+		result, err := ai.Chat(ctx, MODEL_NAME, prompt, code)
+		if err != nil {
+			log.Fatalf("ai chat error: %s", err.Error())
+		}
+
+		var answer ai.Answer
+		if err := json.Unmarshal([]byte(result), &answer); err != nil {
+			log.Fatalf("parse ai answer from json error: %s", err.Error())
+		}
+
+		changes = append(changes, answer.Desc)
+		flags = append(flags, answer.Pass)
+		if !answer.Pass {
+			temp := make([]string, 0, len(answer.Problems))
+			for _, problem := range answer.Problems {
+				comment := fmt.Sprintf("### ⚠️ Problem Found\n\n%s\n\n\n**File**:\n%s\n\n\n**Error Code**:\n%s\n\n\n**Suggestion**:\n%s\n", problem.Reason, problem.File, problem.Code, problem.Suggestion)
+
+				temp = append(temp, comment)
+			}
+
+			if len(temp) > 0 {
+				comment := strings.Join(temp, "\n---\n")
+
+				position := getPosition(file.GetPatch())
+
+				if err := client.CreateComments(ctx, pr, []*github.DraftReviewComment{
+					{
+						Path:     file.Filename,
+						Position: &position,
+						Body:     &comment,
+					},
+				}); err != nil {
+					log.Fatalf("create comments error: %s", err.Error())
+				}
+			}
+		}
 	}
 
-	// 审核未通过
-	comment := "❌ 您的 PR 审核**未通过**，请参考错误信息修改后重新提交哦～\n\n"
-	prombleTemplate := "---\n**文件名**: `%s`\n\n%s\n\n⚠️ **问题描述**\n%s\n\n💡 **修改建议**\n%s\n\n"
-	for _, promble := range answer.Problems {
-		comment += fmt.Sprintf(prombleTemplate, promble.File, promble.Code, promble.Description, promble.Suggestion)
+	// summary
+	for _, each := range flags {
+		if !each {
+			if err := client.UpdatePRReviewStatus(ctx, pr, false, "⚠️ Problem Found"); err != nil {
+				log.Fatalf("update review status error: %s", err.Error())
+			}
+			return
+		}
 	}
 
-	// 审查不通过
-	if err := gClient.SetReviewStatus(ctx, REPO_OWNER, REPO_NAME, PR_NUMBER, false, comment); err != nil {
-		log.Println("set review status to false error")
-		log.Fatal(err)
+	// all pass
+	result, err := ai.Chat(ctx, MODEL_NAME, summary, fmt.Sprintf("Origin PR Title: %s\n\nCommits:\n %s", pr.GetTitle(), strings.Join(changes, "\n\n")))
+	if err != nil {
+		log.Fatalf("generate PR summary error: %s", err.Error())
 	}
 
-	// 审查不通过 action 报错
-	log.Fatal("Critical Issues Found")
+	var summary ai.Summary
+	if err := json.Unmarshal([]byte(result), &summary); err != nil {
+		log.Fatalf("parse ai summary json error: %s", err.Error())
+	}
+
+	if err := client.UpdatePRDetails(ctx, summary.Title, summary.Description); err != nil {
+		log.Fatalf("update PR details error: %s", err.Error())
+	}
+
+	if err := client.UpdatePRReviewStatus(ctx, pr, true, "LGTM"); err != nil {
+		log.Fatalf("update review status error: %s", err.Error())
+	}
+}
+
+func hasReviewPassHeader(content string) bool {
+	scanner := bufio.NewScanner(strings.NewReader(content))
+	lineCount := 0
+	for scanner.Scan() {
+		if lineCount >= 5 {
+			break
+		}
+		line := strings.TrimSpace(scanner.Text())
+		if strings.Contains(line, "Review: PASS") {
+			return true
+		}
+		lineCount++
+	}
+	return false
+}
+
+func getPosition(v string) int {
+	count := 0
+	scanner := bufio.NewScanner(strings.NewReader(v))
+	for scanner.Scan() {
+		line := scanner.Text()
+		if strings.HasPrefix(line, "@@") {
+			continue
+		}
+		count += 1
+	}
+
+	return count
 }

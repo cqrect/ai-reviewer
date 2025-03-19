@@ -187,6 +187,11 @@ func main() {
 		}
 	}
 
+	// if no changes, do not generate summary
+	if len(changes) < 1 {
+		return
+	}
+
 	// addtional summary
 	if config.GetSummary() != "" {
 		summary += fmt.Sprintf("\nHere are some additional rules you need to follow:\n%s", config.GetSummary())
